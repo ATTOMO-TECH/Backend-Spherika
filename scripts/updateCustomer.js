@@ -1,5 +1,7 @@
 require("dotenv").config();
 const axios = require("axios");
+const { getAccessToken } = require("./shopifyAuth");
+const token = await getAccessToken();
 
 const SHOP_NAME = process.env.SHOP_NAME;
 const ACCESS_TOKEN = process.env.ACCESS_TOKEN;
@@ -10,7 +12,8 @@ const getMetafieldId = async (customerId, namespace, key) => {
   try {
     const response = await axios.get(endpoint, {
       headers: {
-        "X-Shopify-Access-Token": ACCESS_TOKEN,
+        "X-Shopify-Access-Token": token,
+        "Content-Type": "application/json",
       },
     });
     const metafields = response.data.metafields;
@@ -33,7 +36,7 @@ const createCustomerMetafield = async (
   customerId,
   namespace,
   key,
-  newValue
+  newValue,
 ) => {
   const endpoint = `https://${SHOP_NAME}/admin/api/2023-07/customers/${customerId}/metafields.json`;
 
@@ -52,7 +55,8 @@ const createCustomerMetafield = async (
   try {
     const response = await axios.post(endpoint, payload, {
       headers: {
-        "X-Shopify-Access-Token": ACCESS_TOKEN,
+        "X-Shopify-Access-Token": token,
+        "Content-Type": "application/json",
       },
     });
 
@@ -119,9 +123,10 @@ const updateCustomerMetafield = async (customerId, metafieldId, value) => {
       },
       {
         headers: {
-          "X-Shopify-Access-Token": ACCESS_TOKEN,
+          "X-Shopify-Access-Token": token,
+          "Content-Type": "application/json",
         },
-      }
+      },
     );
 
     console.log("Shopify response:", response.data);
@@ -144,11 +149,11 @@ const updateCustomerMetafieldBoolean = async (customerId, key, newValue) => {
 
   // Logs para verificar los valores recibidos
   console.log(
-    `Received data: Customer ID - ${customerId}, Key - ${key}, New Value - ${newValue}`
+    `Received data: Customer ID - ${customerId}, Key - ${key}, New Value - ${newValue}`,
   );
 
   console.log(
-    `Fetching metafield ID for customer ${customerId} with key ${key}`
+    `Fetching metafield ID for customer ${customerId} with key ${key}`,
   );
   const metafieldId = await getMetafieldId(customerId, namespace, key);
 
@@ -165,7 +170,7 @@ const updateCustomerMetafieldBoolean = async (customerId, key, newValue) => {
       customerId,
       namespace,
       key,
-      newValue
+      newValue,
     );
 
     if (newMetafield) {
@@ -181,7 +186,8 @@ const updateCustomerMetafieldBoolean = async (customerId, key, newValue) => {
 const createBirthdayMetafieldForCustomer = async (customerId, birthday) => {
   const endpoint = `https://${SHOP_NAME}/admin/api/2023-07/customers/${customerId}/metafields.json`;
   const headers = {
-    "X-Shopify-Access-Token": ACCESS_TOKEN,
+    "X-Shopify-Access-Token": token,
+    "Content-Type": "application/json",
   };
   const data = {
     metafield: {
@@ -195,13 +201,13 @@ const createBirthdayMetafieldForCustomer = async (customerId, birthday) => {
   try {
     const response = await axios.post(endpoint, data, { headers });
     console.log(
-      `Metafield created for customer ${customerId} with birthday: ${birthday}`
+      `Metafield created for customer ${customerId} with birthday: ${birthday}`,
     );
     return response.data;
   } catch (error) {
     console.error(
       `Error creating birthday metafield for customer ${customerId}:`,
-      error.message
+      error.message,
     );
     return null;
   }

@@ -1,5 +1,7 @@
 require("dotenv").config();
 const axios = require("axios");
+const { getAccessToken } = require("./shopifyAuth");
+const token = await getAccessToken();
 
 const SHOP_NAME = process.env.SHOP_NAME;
 const ACCESS_TOKEN = process.env.ACCESS_TOKEN;
@@ -12,7 +14,8 @@ const getCustomerMetafields = async (customerId) => {
   try {
     const response = await axios.get(endpoint, {
       headers: {
-        "X-Shopify-Access-Token": ACCESS_TOKEN,
+        "X-Shopify-Access-Token": token,
+        "Content-Type": "application/json",
       },
     });
     return response.data.metafields || [];
@@ -27,19 +30,19 @@ const createOrUpdateMetafield = async (customerId, metafieldKey) => {
 
   const existingMetafield = existingMetafields.find(
     (metafield) =>
-      metafield.namespace === NAMESPACE && metafield.key === metafieldKey
+      metafield.namespace === NAMESPACE && metafield.key === metafieldKey,
   );
 
   if (existingMetafield) {
     if (existingMetafield.value === "true") {
       // No sobrescribimos si ya es true
       console.log(
-        `Metafield ${metafieldKey} for customer ${customerId} is already true. Skipping.`
+        `Metafield ${metafieldKey} for customer ${customerId} is already true. Skipping.`,
       );
     } else {
       // Si el valor existente no es "true", lo actualizamos a "false"
       console.log(
-        `Metafield ${metafieldKey} for customer ${customerId} has a value of ${existingMetafield.value}. Updating to false.`
+        `Metafield ${metafieldKey} for customer ${customerId} has a value of ${existingMetafield.value}. Updating to false.`,
       );
       await updateCustomerMetafield(customerId, existingMetafield.id, "false");
     }
@@ -58,16 +61,17 @@ const createOrUpdateMetafield = async (customerId, metafieldKey) => {
     try {
       await axios.post(endpoint, payload, {
         headers: {
-          "X-Shopify-Access-Token": ACCESS_TOKEN,
+          "X-Shopify-Access-Token": token,
+          "Content-Type": "application/json",
         },
       });
       console.log(
-        `Metafield ${metafieldKey} for customer ${customerId} created with value false.`
+        `Metafield ${metafieldKey} for customer ${customerId} created with value false.`,
       );
     } catch (error) {
       console.error(
         `Error creating metafield ${metafieldKey} for customer ${customerId}:`,
-        error.message
+        error.message,
       );
     }
   }
