@@ -18,7 +18,7 @@ const { updateCustomerTag } = require("./scripts/updateB2BTag");
 const { sendMail } = require("./scripts/sendMail");
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const { PORT } = require("./config/config");
 
 // --- MIDDLEWARE ---
 app.use(

@@ -5,6 +5,16 @@ let cachedToken = null;
 let expiresAt = 0;
 
 async function getAccessToken() {
+  if (
+    !CONFIG.SHOPIFY_CLIENT_ID ||
+    !CONFIG.SHOPIFY_CLIENT_SECRET ||
+    !CONFIG.SHOPIFY_SHOP
+  ) {
+    throw new Error(
+      "Faltan SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET o SHOPIFY_SHOP",
+    );
+  }
+
   if (cachedToken && Date.now() < expiresAt - 60_000) {
     return cachedToken;
   }
@@ -32,7 +42,6 @@ async function getAccessToken() {
   }
 
   const data = await response.json();
-
   cachedToken = data.access_token;
   expiresAt = Date.now() + (data.expires_in || 86400) * 1000;
 
