@@ -1,17 +1,18 @@
 require("dotenv").config();
 const axios = require("axios");
-
-const SHOP_NAME = process.env.SHOP_NAME;
-const ACCESS_TOKEN = process.env.ACCESS_TOKEN;
+const { getAccessToken } = require("./shopifyAuth");
+const token = await getAccessToken();
+const SHOPIFY_SHOP = process.env.SHOPIFY_SHOP;
 
 const updateCustomerTag = async (customerId, tag) => {
-  const endpoint = `https://${SHOP_NAME}/admin/api/2023-04/customers/${customerId}.json`;
+  const endpoint = `https://${SHOPIFY_SHOP}/admin/api/2023-04/customers/${customerId}.json`;
 
   try {
     const getResponse = await axios.get(endpoint, {
       headers: {
-        'X-Shopify-Access-Token': ACCESS_TOKEN
-      }
+        "X-Shopify-Access-Token": token,
+        "Content-Type": "application/json",
+      },
     });
 
     let existingTags = getResponse.data.customer.tags;
@@ -24,14 +25,15 @@ const updateCustomerTag = async (customerId, tag) => {
     const payload = {
       customer: {
         id: customerId,
-        tags: existingTags.join(",")
-      }
+        tags: existingTags.join(","),
+      },
     };
 
     const response = await axios.put(endpoint, payload, {
       headers: {
-        'X-Shopify-Access-Token': ACCESS_TOKEN
-      }
+        "X-Shopify-Access-Token": token,
+        "Content-Type": "application/json",
+      },
     });
 
     return response.data.customer;
@@ -42,5 +44,5 @@ const updateCustomerTag = async (customerId, tag) => {
 };
 
 module.exports = {
-  updateCustomerTag
+  updateCustomerTag,
 };

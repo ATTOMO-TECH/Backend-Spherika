@@ -2,7 +2,7 @@ require("dotenv").config();
 const axios = require("axios");
 const { getAccessToken } = require("../config/shopifyAuth");
 
-const SHOP_NAME = process.env.SHOP_NAME || process.env.SHOPIFY_SHOP;
+const SHOPIFY_SHOP = process.env.SHOPIFY_SHOP || process.env.SHOPIFY_SHOP;
 
 const getHeaders = async () => {
   const token = await getAccessToken();
@@ -14,7 +14,7 @@ const getHeaders = async () => {
 };
 
 const getMetafieldId = async (customerId, namespace, key) => {
-  const endpoint = `https://${SHOP_NAME}/admin/api/2023-07/customers/${customerId}/metafields.json`;
+  const endpoint = `https://${SHOPIFY_SHOP}/admin/api/2023-07/customers/${customerId}/metafields.json`;
 
   try {
     const response = await axios.get(endpoint, {
@@ -47,7 +47,7 @@ const createCustomerMetafield = async (
   key,
   newValue,
 ) => {
-  const endpoint = `https://${SHOP_NAME}/admin/api/2023-07/customers/${customerId}/metafields.json`;
+  const endpoint = `https://${SHOPIFY_SHOP}/admin/api/2023-07/customers/${customerId}/metafields.json`;
 
   const stringValue = newValue.toString();
 
@@ -78,7 +78,7 @@ const createCustomerMetafield = async (
 };
 
 const updateCustomerMetafield = async (customerId, metafieldId, value) => {
-  const endpoint = `https://${SHOP_NAME}/admin/api/2023-07/customers/${customerId}/metafields/${metafieldId}.json`;
+  const endpoint = `https://${SHOPIFY_SHOP}/admin/api/2023-07/customers/${customerId}/metafields/${metafieldId}.json`;
 
   console.log(`Value to be sent: ${value.toString()}`);
   console.log(`Updating metafield with ID ${metafieldId} to value: ${value}`);
@@ -150,7 +150,7 @@ const updateCustomerMetafieldBoolean = async (customerId, key, newValue) => {
 };
 
 const createBirthdayMetafieldForCustomer = async (customerId, birthday) => {
-  const endpoint = `https://${SHOP_NAME}/admin/api/2023-07/customers/${customerId}/metafields.json`;
+  const endpoint = `https://${SHOPIFY_SHOP}/admin/api/2023-07/customers/${customerId}/metafields.json`;
 
   const data = {
     metafield: {

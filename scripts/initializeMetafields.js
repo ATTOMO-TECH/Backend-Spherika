@@ -3,13 +3,12 @@ const axios = require("axios");
 const { getAccessToken } = require("./shopifyAuth");
 const token = await getAccessToken();
 
-const SHOP_NAME = process.env.SHOP_NAME;
-const ACCESS_TOKEN = process.env.ACCESS_TOKEN;
+const SHOPIFY_SHOP = process.env.SHOPIFY_SHOP;
 const META_FIELDS = ["compra", "ocasi_n", "nacionalidad", "consumidor"];
 const NAMESPACE = "custom";
 
 const getCustomerMetafields = async (customerId) => {
-  const endpoint = `https://${SHOP_NAME}/admin/api/2023-07/customers/${customerId}/metafields.json`;
+  const endpoint = `https://${SHOPIFY_SHOP}/admin/api/2023-07/customers/${customerId}/metafields.json`;
 
   try {
     const response = await axios.get(endpoint, {
@@ -48,7 +47,7 @@ const createOrUpdateMetafield = async (customerId, metafieldKey) => {
     }
   } else {
     // Si no existe, lo creamos
-    const endpoint = `https://${SHOP_NAME}/admin/api/2023-07/customers/${customerId}/metafields.json`;
+    const endpoint = `https://${SHOPIFY_SHOP}/admin/api/2023-07/customers/${customerId}/metafields.json`;
     const payload = {
       metafield: {
         namespace: NAMESPACE,
