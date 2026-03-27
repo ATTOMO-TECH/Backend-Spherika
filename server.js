@@ -21,38 +21,15 @@ const app = express();
 const { PORT } = require("./config/config");
 
 // --- MIDDLEWARE ---
-const allowedOrigins = [
-  "https://caviarspherika.com",
-  "https://www.caviarspherika.com",
-  "https://caviarspherika.myshopify.com",
-];
-
 app.use(
   cors({
-    origin: function (origin, callback) {
-      // Permite requests sin origin (Postman, health checks)
-      if (!origin) return callback(null, true);
-
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-
-      return callback(new Error(`CORS bloqueado para este origen: ${origin}`));
-    },
-    methods: ["GET", "POST", "OPTIONS"],
-    allowedHeaders: ["Content-Type"],
+    origin: "https://caviarspherika.com", // Reemplaza esto con tu dominio confiable
   }),
 );
-
-// Manejo de preflight
-app.options("*", cors());
-
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
+app.use(express.json()); // Para parsear application/json
+app.use(express.urlencoded({ extended: true })); // Para parsear application/x-www-form-urlencoded
 app.use((req, res, next) => {
   console.log(`Petición recibida: ${req.method} ${req.url}`);
-  console.log(`Origin: ${req.headers.origin || "sin origin"}`);
   next();
 });
 // ------------------
