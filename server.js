@@ -21,15 +21,38 @@ const app = express();
 const { PORT } = require("./config/config");
 
 // --- MIDDLEWARE ---
+const allowedOrigins = [
+  "https://caviarspherika.com",
+  "https://www.caviarspherika.com",
+  "https://caviarspherika.myshopify.com",
+];
+
 app.use(
   cors({
-    origin: "https://caviarspherika.com", // Reemplaza esto con tu dominio confiable
+    origin: function (origin, callback) {
+      // Permite requests sin origin (Postman, health checks)
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error(`CORS bloqueado para este origen: ${origin}`));
+    },
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["Content-Type"],
   }),
 );
-app.use(express.json()); // Para parsear application/json
-app.use(express.urlencoded({ extended: true })); // Para parsear application/x-www-form-urlencoded
+
+// Manejo de preflight
+app.options("*", cors());
+
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
 app.use((req, res, next) => {
   console.log(`Petición recibida: ${req.method} ${req.url}`);
+  console.log(`Origin: ${req.headers.origin || "sin origin"}`);
   next();
 });
 // ------------------
@@ -274,17 +297,7 @@ app.post("/api/vat/validate", async (req, res) => {
     });
   }
 });
-app.post("/mail/sendMail", async (req, res) => {
-  try {
-    await sendMail(req, res);
-  } catch (error) {
-    console.error("Error al enviar correo:", error.message);
-    res.status(500).json({
-      success: false,
-      error: "Error al enviar el correo.",
-    });
-  }
-});
+app.post("/mail/sendMail", sendMail);
 
 // -----------------------------
 
