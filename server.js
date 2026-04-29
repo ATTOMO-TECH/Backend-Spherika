@@ -304,7 +304,10 @@ app.post("/api/vat/validate", async (req, res) => {
 app.post("/mail/sendMail", sendMail);
 
 // -----------------------------
-
+app.get("/update-metafield", (req, res) => {
+  console.log("⚠️ Se recibió un GET en /update-metafield. Redirigiendo al usuario...");
+  res.redirect("https://caviarspherika.com/account");
+});
 // --- INICIO DEL SERVIDOR ---
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
