@@ -21,11 +21,28 @@ const app = express();
 const { PORT } = require("./config/config");
 
 // --- MIDDLEWARE ---
-app.use(
-  cors({
-    origin: "https://caviarspherika.com", // Reemplaza esto con tu dominio confiable
-  }),
-);
+const allowedOrigins = [
+  /^https?:\/\/([a-z0-9-]+\.)*caviarspherika\.com$/i,
+  /^https?:\/\/([a-z0-9-]+\.)*myshopify\.com$/i,
+];
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.some((re) => re.test(origin))) {
+      return callback(null, true);
+    }
+    return callback(null, false);
+  },
+  methods: ["GET", "POST", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true,
+  optionsSuccessStatus: 204,
+};
+
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
+
 app.use(express.json()); // Para parsear application/json
 app.use(express.urlencoded({ extended: true })); // Para parsear application/x-www-form-urlencoded
 app.use((req, res, next) => {
