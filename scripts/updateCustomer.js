@@ -111,41 +111,29 @@ const updateCustomerMetafield = async (customerId, metafieldId, value) => {
 };
 
 const updateCustomerMetafieldBoolean = async (customerId, key, newValue) => {
-  newValue = String(newValue).toLowerCase();
-  const namespace = "custom";
+  try {
+    newValue = String(newValue).toLowerCase();
+    const namespace = "custom";
 
-  console.log(
-    `Received data: Customer ID - ${customerId}, Key - ${key}, New Value - ${newValue}`,
-  );
+    console.log(`[Script] Buscando ID para: ${namespace}.${key}`);
+    const metafieldId = await getMetafieldId(customerId, namespace, key);
 
-  console.log(
-    `Fetching metafield ID for customer ${customerId} with key ${key}`,
-  );
-
-  const metafieldId = await getMetafieldId(customerId, namespace, key);
-
-  console.log(`Received metafield ID: ${metafieldId}`);
-
-  if (metafieldId) {
-    console.log(`Updating metafield ${key} with new value: ${newValue}`);
-    return await updateCustomerMetafield(customerId, metafieldId, newValue);
-  } else {
-    console.error(`Metafield ${key} not found. Creating a new one.`);
-
-    const newMetafield = await createCustomerMetafield(
-      customerId,
-      namespace,
-      key,
-      newValue,
-    );
-
-    if (newMetafield) {
-      console.log(`Metafield ${key} created successfully.`);
-      return newMetafield;
+    if (metafieldId) {
+      console.log(`[Script] ID encontrado (${metafieldId}). Enviando PUT...`);
+      return await updateCustomerMetafield(customerId, metafieldId, newValue);
     } else {
-      console.error(`Error creating the metafield ${key}.`);
-      return null;
+      console.log(`[Script] No existe. Enviando POST para crear...`);
+      const newMetafield = await createCustomerMetafield(
+        customerId,
+        namespace,
+        key,
+        newValue
+      );
+      return newMetafield;
     }
+  } catch (err) {
+    console.error("[Script] Error fatal en lógica de metacampos:", err.message);
+    throw err; // Re-lanzamos para que el server.js lo capture
   }
 };
 

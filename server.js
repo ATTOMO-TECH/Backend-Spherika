@@ -98,43 +98,53 @@ app.post("/update-metafield", async (req, res) => {
   try {
     const { customerId, metafields } = req.body;
 
-    console.log("Received metafields[recetas]:", req.body.metafields?.recetas);
+    console.log("--- INICIO UPDATE-METAFIELD ---");
+    console.log("ID Cliente:", customerId);
+    console.log("Metafields recibidos:", JSON.stringify(metafields));
 
     if (!customerId || !metafields) {
-      return res
-        .status(400)
-        .send("Missing customerId or metafields in request.");
+      console.error("❌ Error: Faltan datos obligatorios (customerId o metafields)");
+      return res.status(400).send("Missing customerId or metafields in request.");
     }
 
     let errors = [];
-    for (const [key, value] of Object.entries(metafields)) {
+    // Convertimos a array para asegurar el manejo secuencial con logs
+    const entries = Object.entries(metafields);
+    console.log(`Procesando ${entries.length} metacampos...`);
+
+    for (const [key, value] of entries) {
       try {
+        console.log(`Actualizando [${key}] a valor: ${value}`);
         const result = await updateCustomerMetafieldBoolean(
           customerId,
           key,
-          value === "true",
+          value === "true"
         );
+
         if (!result) {
+          console.error(`⚠️ Fallo al actualizar la clave: ${key}`);
           errors.push(`Error updating metafield with key: ${key}.`);
+        } else {
+          console.log(`✅ Éxito en clave: ${key}`);
         }
       } catch (error) {
-        errors.push(
-          `Error processing request for metafield with key: ${key}. Error: ${error.message}`,
-        );
+        console.error(`❌ Excepción en clave [${key}]:`, error.message);
+        errors.push(`Error: ${error.message}`);
       }
     }
 
     if (errors.length > 0) {
+      console.error("--- FINALIZADO CON ERRORES ---", errors);
       res.status(500).send({ errors });
     } else {
+      console.log("--- FINALIZADO CON ÉXITO: REDIRECCIONANDO ---");
       res.redirect("https://caviarspherika.com/account");
     }
   } catch (error) {
-    console.error("Error updating metafield:", error);
+    console.error("❌ ERROR CRÍTICO EN /UPDATE-METAFIELD:", error);
     res.status(500).send("Error processing request.");
   }
 });
-
 app.post("/customer-birthday", async (req, res) => {
   const customerData = req.body; // Datos del cliente enviados por Shopify
   const notes = customerData.note || ""; // Acceder a la nota del cliente
