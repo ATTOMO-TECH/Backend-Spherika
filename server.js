@@ -1,26 +1,27 @@
 const express = require("express");
 const cors = require("cors");
-const axios = require("axios"); // 👈 AÑADIDO
+const axios = require("axios");
 const xml2js = require("xml2js");
 const { Parser, processors } = xml2js;
+
 const {
   getCustomers,
   getCustomerById,
   getCustomerMetafields,
 } = require("./scripts/getCustomers");
+
 const {
   updateCustomerMetafieldBoolean,
   createBirthdayMetafieldForCustomer,
 } = require("./scripts/updateCustomer");
 
-// Importa la lógica para actualizar la etiqueta B2B
 const { updateCustomerTag } = require("./scripts/updateB2BTag");
 const { sendMail } = require("./scripts/sendMail");
-
-const app = express();
 const { PORT } = require("./config/config");
 
-// --- MIDDLEWARE ---
+const app = express();
+
+// --- CONFIGURACIÓN DE CORS ---
 const allowedOrigins = [
   /^https?:\/\/([a-z0-9-]+\.)*caviarspherika\.com$/i,
   /^https?:\/\/([a-z0-9-]+\.)*myshopify\.com$/i,
@@ -40,275 +41,170 @@ const corsOptions = {
   optionsSuccessStatus: 204,
 };
 
+// --- MIDDLEWARES (Orden Crítico) ---
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
 
-app.use(express.json()); // Para parsear application/json
-app.use(express.urlencoded({ extended: true })); // Para parsear application/x-www-form-urlencoded
+// Estos dos deben ir ANTES de las rutas para que req.body no sea undefined
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Logger para ver qué llega a Railway
 app.use((req, res, next) => {
-  console.log(`Petición recibida: ${req.method} ${req.url}`);
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
   next();
 });
-// ------------------
 
-// --- RUTAS DE CLIENTES Y METAFIELES ---
+// --- RUTAS ---
+
+// 1. Ruta principal que te está dando problemas
+app.post("/update-metafield", async (req, res) => {
+  try {
+    console.log("--- INICIO UPDATE-METAFIELD ---");
+    console.log("Body completo recibido:", JSON.stringify(req.body));
+
+    const { customerId, metafields } = req.body;
+
+    if (!customerId || !metafields) {
+      console.error("❌ Error: Faltan datos obligatorios (customerId o metafields)");
+      return res.status(400).json({
+        error: "Missing customerId or metafields",
+        received: req.body
+      });
+    }
+
+    let errors = [];
+    const entries = Object.entries(metafields);
+    console.log(`Procesando ${entries.length} metacampos para el cliente ${customerId}...`);
+
+    for (const [key, value] of entries) {
+      try {
+        console.log(`Actualizando clave [${key}] con valor: ${value}`);
+        // Forzamos el valor a boolean si viene como string "true"/"false"
+        const boolValue = (value === "true" || value === true);
+
+        const result = await updateCustomerMetafieldBoolean(
+          customerId,
+          key,
+          boolValue
+        );
+
+        if (!result) {
+          console.error(`⚠️ No se pudo actualizar la clave: ${key}`);
+          errors.push(`Error updating metafield: ${key}`);
+        } else {
+          console.log(`✅ Éxito en clave: ${key}`);
+        }
+      } catch (error) {
+        console.error(`❌ Excepción en clave [${key}]:`, error.message);
+        errors.push(`Excepción en ${key}: ${error.message}`);
+      }
+    }
+
+    if (errors.length > 0) {
+      console.error("--- FINALIZADO CON ERRORES ---", errors);
+      return res.status(500).json({ success: false, errors });
+    } else {
+      console.log("--- FINALIZADO CON ÉXITO: REDIRECCIONANDO ---");
+      // Redirigimos al usuario de vuelta a su cuenta en Shopify
+      return res.redirect("https://caviarspherika.com/account");
+    }
+  } catch (error) {
+    console.error("❌ ERROR CRÍTICO EN /UPDATE-METAFIELD:", error);
+    return res.status(500).send("Internal Server Error: " + error.message);
+  }
+});
+
+// Manejador para evitar errores 502/404 si alguien entra por URL directa (GET)
+app.get("/update-metafield", (req, res) => {
+  console.log("⚠️ Intento de GET en ruta POST. Redirigiendo...");
+  res.redirect("https://caviarspherika.com/account");
+});
+
+// 2. Otras rutas de Clientes
 app.get("/customers", async (req, res) => {
   try {
     const customers = await getCustomers();
     res.json(customers);
   } catch (error) {
-    console.error("Error retrieving customers:", error);
     res.status(500).send("Error retrieving customers.");
   }
 });
 
 app.get("/customer/:id", async (req, res) => {
   try {
-    const customerId = req.params.id;
-    const customer = await getCustomerById(customerId);
-    if (customer) {
-      res.json(customer);
-    } else {
-      res.status(404).json({ error: "Customer not found" });
-    }
+    const customer = await getCustomerById(req.params.id);
+    customer ? res.json(customer) : res.status(404).json({ error: "Not found" });
   } catch (error) {
-    console.error("Error getting customer by ID:", error);
     res.status(500).send("Error processing request.");
   }
 });
 
 app.get("/customer-metafields/:customerId", async (req, res) => {
   try {
-    const customerId = req.params.customerId;
-    const metafields = await getCustomerMetafields(customerId);
-    if (metafields) {
-      res.json(metafields);
-    } else {
-      res
-        .status(404)
-        .json({ error: "Metafields not found for the given customer ID." });
-    }
+    const metafields = await getCustomerMetafields(req.params.customerId);
+    metafields ? res.json(metafields) : res.status(404).send("Not found");
   } catch (error) {
-    console.error("Error getting customer metafields:", error);
     res.status(500).json({ error: error.message });
   }
 });
 
-app.post("/update-metafield", async (req, res) => {
-  try {
-    const { customerId, metafields } = req.body;
-
-    console.log("--- INICIO UPDATE-METAFIELD ---");
-    console.log("ID Cliente:", customerId);
-    console.log("Metafields recibidos:", JSON.stringify(metafields));
-
-    if (!customerId || !metafields) {
-      console.error("❌ Error: Faltan datos obligatorios (customerId o metafields)");
-      return res.status(400).send("Missing customerId or metafields in request.");
-    }
-
-    let errors = [];
-    // Convertimos a array para asegurar el manejo secuencial con logs
-    const entries = Object.entries(metafields);
-    console.log(`Procesando ${entries.length} metacampos...`);
-
-    for (const [key, value] of entries) {
-      try {
-        console.log(`Actualizando [${key}] a valor: ${value}`);
-        const result = await updateCustomerMetafieldBoolean(
-          customerId,
-          key,
-          value === "true"
-        );
-
-        if (!result) {
-          console.error(`⚠️ Fallo al actualizar la clave: ${key}`);
-          errors.push(`Error updating metafield with key: ${key}.`);
-        } else {
-          console.log(`✅ Éxito en clave: ${key}`);
-        }
-      } catch (error) {
-        console.error(`❌ Excepción en clave [${key}]:`, error.message);
-        errors.push(`Error: ${error.message}`);
-      }
-    }
-
-    if (errors.length > 0) {
-      console.error("--- FINALIZADO CON ERRORES ---", errors);
-      res.status(500).send({ errors });
-    } else {
-      console.log("--- FINALIZADO CON ÉXITO: REDIRECCIONANDO ---");
-      res.redirect("https://caviarspherika.com/account");
-    }
-  } catch (error) {
-    console.error("❌ ERROR CRÍTICO EN /UPDATE-METAFIELD:", error);
-    res.status(500).send("Error processing request.");
-  }
-});
+// 3. B2B y Birthday
 app.post("/customer-birthday", async (req, res) => {
-  const customerData = req.body; // Datos del cliente enviados por Shopify
-  const notes = customerData.note || ""; // Acceder a la nota del cliente
-  let birthday;
-
-  // Extraer la fecha de cumpleaños de las notas si existe
-  const birthdayNote = notes.match(/cumpleaños: ([0-9-]+)/); // Ajusta la regex según tu formato
-  if (birthdayNote) {
-    birthday = birthdayNote[1]; // Obtener la fecha de cumpleaños de la nota
-  }
-
   try {
-    const metafield = await createBirthdayMetafieldForCustomer(
-      customerData.id,
-      birthday,
-    );
+    const { id, note } = req.body;
+    const birthdayNote = (note || "").match(/cumpleaños: ([0-9-]+)/);
+    const birthday = birthdayNote ? birthdayNote[1] : null;
+    const metafield = await createBirthdayMetafieldForCustomer(id, birthday);
     res.status(200).json(metafield);
   } catch (error) {
-    console.error("Error creating birthday metafield:", error);
-    res.status(500).send("Error processing request.");
+    res.status(500).send("Error processing birthday.");
   }
 });
 
-// Nueva ruta para actualizar la etiqueta B2B
 app.post("/update-b2b-tag", async (req, res) => {
   try {
     const { customerId } = req.body;
-
-    if (!customerId) {
-      return res.status(400).send("Falta el customerId.");
-    }
-
-    // Usamos la función para actualizar la etiqueta B2B del cliente
+    if (!customerId) return res.status(400).send("Falta customerId");
     const result = await updateCustomerTag(customerId, "B2B");
-
-    if (result) {
-      res.status(200).json({
-        success: true,
-        message: "Etiqueta B2B actualizada correctamente.",
-      });
-    } else {
-      res.status(500).json({
-        success: false,
-        message: "Error al actualizar la etiqueta B2B.",
-      });
-    }
+    res.status(result ? 200 : 500).json({ success: !!result });
   } catch (error) {
-    console.error("Error al actualizar la etiqueta B2B:", error.message);
-    res.status(500).send("Error procesando la solicitud.");
+    res.status(500).send("Error B2B.");
   }
 });
 
-// --- RUTA VAT / VIES ---
-const VIES_URL =
-  "https://ec.europa.eu/taxation_customs/vies/services/checkVatService";
+// 4. Validación VAT (VIES)
+const VIES_URL = "https://ec.europa.eu/taxation_customs/vies/services/checkVatService";
 
 app.post("/api/vat/validate", async (req, res) => {
-  console.log("Body recibido:", req.body);
   try {
     const { vat } = req.body;
+    if (!vat) return res.status(400).json({ error: "VAT requerido" });
 
-    if (!vat || typeof vat !== "string") {
-      return res
-        .status(400)
-        .json({ success: false, error: "VAT requerido en el body." });
-    }
+    const match = vat.trim().toUpperCase().match(/^([A-Z]{2})([0-9A-Z]+)$/);
+    if (!match) return res.json({ valid: false, reason: "Formato inválido" });
 
-    const raw = vat.trim().toUpperCase();
-    const match = raw.match(/^([A-Z]{2})([0-9A-Z]+)$/);
-    if (!match) {
-      return res.json({
-        success: true,
-        valid: false,
-        reason:
-          "Formato incorrecto. Debe empezar por código de país, ej. ES, FR, DE.",
-      });
-    }
+    const xml = `<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tns="urn:ec.europa.eu:taxud:vies:services:checkVat:types"><soap:Body><tns:checkVat><tns:countryCode>${match[1]}</tns:countryCode><tns:vatNumber>${match[2]}</tns:vatNumber></tns:checkVat></soap:Body></soap:Envelope>`;
 
-    const countryCode = match[1];
-    const vatNumber = match[2];
-
-    const xml = `
-      <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tns="urn:ec.europa.eu:taxud:vies:services:checkVat:types">
-        <soap:Body>
-          <tns:checkVat>
-            <tns:countryCode>${countryCode}</tns:countryCode>
-            <tns:vatNumber>${vatNumber}</tns:vatNumber>
-          </tns:checkVat>
-        </soap:Body>
-      </soap:Envelope>
-    `.trim();
-
-    const { data } = await axios.post(VIES_URL, xml, {
-      headers: {
-        "Content-Type": "text/xml; charset=utf-8",
-        // axios ya pone Content-Length solo, realmente no hace falta
-      },
-      timeout: 15000,
-    });
-
-    console.log("VIES XML Response (Raw):", data);
-
-    // Parser que quita prefijos (soap:, ns2:, tns:, etc.)
-    const parser = new Parser({
-      explicitArray: true,
-      tagNameProcessors: [processors.stripPrefix],
-    });
-
+    const { data } = await axios.post(VIES_URL, xml, { headers: { "Content-Type": "text/xml" } });
+    const parser = new Parser({ explicitArray: true, tagNameProcessors: [processors.stripPrefix] });
     const result = await parser.parseStringPromise(data);
-    console.log("XML2JS Parsed Object:", JSON.stringify(result, null, 2));
 
-    // Ahora las claves serán: Envelope -> Body -> checkVatResponse
-    const envelope = result.Envelope;
-    if (!envelope || !envelope.Body) {
-      throw new Error("Respuesta SOAP inesperada (sin Envelope/Body)");
-    }
-
-    const body = envelope.Body[0];
-
-    // Manejo de posibles errores SOAP (Fault)
-    if (body.Fault) {
-      console.error("SOAP Fault:", JSON.stringify(body.Fault, null, 2));
-      return res.status(500).json({
-        success: false,
-        error: "Error SOAP devuelto por VIES.",
-      });
-    }
-
-    const responseBody = body.checkVatResponse?.[0];
-    if (!responseBody) {
-      throw new Error("checkVatResponse no encontrado en la respuesta.");
-    }
-
-    const valid = responseBody.valid?.[0] === "true";
-    const name = (responseBody.name?.[0] || "").trim();
-    const address = (responseBody.address?.[0] || "").trim();
-
-    console.log(`Resultado final extraído: Valid=${valid}, Name=${name}`);
-
-    return res.json({
+    const responseBody = result.Envelope.Body[0].checkVatResponse[0];
+    res.json({
       success: true,
-      valid,
-      name,
-      address,
+      valid: responseBody.valid[0] === "true",
+      name: (responseBody.name[0] || "").trim(),
+      address: (responseBody.address[0] || "").trim()
     });
   } catch (error) {
-    console.error(
-      "Error al procesar VAT (posible error de parseo o VIES):",
-      error?.message || error,
-    );
-    return res.status(500).json({
-      success: false,
-      error: "Error al procesar la respuesta o fallo de conexión con VIES.",
-    });
+    res.status(500).json({ success: false, error: error.message });
   }
 });
+
 app.post("/mail/sendMail", sendMail);
 
-// -----------------------------
-app.get("/update-metafield", (req, res) => {
-  console.log("⚠️ Se recibió un GET en /update-metafield. Redirigiendo al usuario...");
-  res.redirect("https://caviarspherika.com/account");
-});
-// --- INICIO DEL SERVIDOR ---
+// --- INICIO ---
 app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
+  console.log(`✅ Servidor Spherika activo en puerto: ${PORT}`);
 });
